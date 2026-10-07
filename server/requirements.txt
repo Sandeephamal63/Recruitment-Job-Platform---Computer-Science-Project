@@ -1,0 +1,24 @@
+Flask==3.1.0
+Flask-JWT-Extended==4.6.0
+bcrypt==4.2.1
+pymongo[srv]==4.10.1
+python-dotenv==1.0.1
+marshmallow==3.23.2
+flask-cors==5.0.0
+python-magic==0.4.27
+pdfminer.six==20240706
+docx2txt==0.8
+flask-limiter==3.8.0
+
+# M4 matching pipeline. torch is installed CPU-only in Dockerfile.dev (keeps
+# the image lean); these are pinned for python:3.12 wheel availability.
+# The spaCy model en_core_web_sm is NOT on PyPI — it ships as a GitHub release
+# wheel and is installed (version-pinned) in Dockerfile.dev.
+torch==2.6.0
+sentence-transformers==3.4.1
+spacy==3.8.16
+scikit-learn==1.6.1
+
+# M6 testing
+pytest==8.3.4
+pytest-cov==6.0.0

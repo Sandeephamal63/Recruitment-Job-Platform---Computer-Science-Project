@@ -1,0 +1,62 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: recruit-mongo
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"const cfg = { _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }; try { rs.initiate(cfg) } catch (e) {}; const s = rs.status(); if (s.ok !== 1 || s.members[0].stateStr !== 'PRIMARY') quit(1)\""]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    container_name: recruit-server
+    restart: unless-stopped
+    environment:
+      MONGO_URI: mongodb://mongo:27017/recruit
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-secret-change-me-in-prod}
+      FLASK_DEBUG: "1"
+      EVAL_DATA_DIR: /data/evaluation
+    ports:
+      - "5001:5000"
+    volumes:
+      - ./server:/app
+      - ./data:/data
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+    container_name: recruit-client
+    restart: unless-stopped
+    environment:
+      VITE_PROXY_TARGET: http://server:5000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app
+      - client-node-modules:/app/node_modules
+    depends_on:
+      - server
+    stdin_open: true
+    tty: true
+
+volumes:
+  mongo-data:
+  client-node-modules:

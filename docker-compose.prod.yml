@@ -1,0 +1,65 @@
+# Production deployment. Unlike the dev compose file, neither service binds its
+# source directory: images are built from Dockerfile.prod and the SPA is served
+# by nginx, which also proxies /api to the server on the compose network.
+#
+# Starting the stack requires a real JWT secret — provide it explicitly:
+#   JWT_SECRET_KEY=$(openssl rand -hex 32) docker compose -f docker-compose.prod.yml up -d --build
+#
+# The SPA is then served at http://localhost:8080 (single-origin: the browser
+# talks only to nginx, which forwards /api to the server).
+#
+# Tearing the stack down is safe with a throwaway interpolated secret:
+#   JWT_SECRET_KEY=x docker compose -f docker-compose.prod.yml down
+services:
+  mongo:
+    image: mongo:7
+    container_name: recruit-mongo-prod
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo-data-prod:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"const cfg = { _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }; try { rs.initiate(cfg) } catch (e) {}; const s = rs.status(); if (s.ok !== 1 || s.members[0].stateStr !== 'PRIMARY') quit(1)\""]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.prod
+    container_name: recruit-server-prod
+    restart: unless-stopped
+    environment:
+      MONGO_URI: mongodb://mongo:27017/recruit
+      MONGO_DB_NAME: recruit
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set for production}
+      JWT_ACCESS_MINUTES: ${JWT_ACCESS_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRES_DAYS: ${REFRESH_TOKEN_EXPIRES_DAYS:-7}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      FLASK_DEBUG: "0"
+      APP_VERSION: ${APP_VERSION:-1.0.0}
+    expose:
+      - "5000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.prod
+    container_name: recruit-client-prod
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - server
+
+volumes:
+  mongo-data-prod:
