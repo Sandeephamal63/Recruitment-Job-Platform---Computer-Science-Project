@@ -30,7 +30,7 @@ export default function HeroSection() {
       <Section spacing="tight">
         <Stack spacing={3} alignItems="center" textAlign="center" sx={{ maxWidth: 700, mx: 'auto' }}>
           <Chip
-            label="Explainable matching, not a black box"
+            label="Recruit makes better matches"
             size="small"
             variant="outlined"
             sx={{
